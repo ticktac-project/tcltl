@@ -37,7 +37,7 @@ AX_CHECK_COMPILE_FLAG([-Werror -fvisibility=hidden],
   [CXXFLAGS="$CXXFLAGS -fvisibility=hidden"
   AX_CHECK_COMPILE_FLAG([-fvisibility-inlines-hidden],
     [CXXFLAGS="$CXXFLAGS -fvisibility-inlines-hidden"])])
-CXXFLAGS="$CXXFLAGS -DSPOT_BUILD"
+CXXFLAGS="$CXXFLAGS -DTCLTL_BUILD"
 
 # Turn on C++14 support
 m4_define([_AX_CXX_COMPILE_STDCXX_14_testbody],
@@ -75,6 +75,8 @@ done
 if ! "${stdpass-false}"; then
   AC_ERROR([unable to turn on C++17 mode with this compiler])
 fi
+
+LT_INIT([win32-dll])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

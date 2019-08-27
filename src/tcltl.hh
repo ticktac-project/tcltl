@@ -27,10 +27,16 @@
 #include <spot/kripke/kripke.hh>
 #include <spot/tl/formula.hh>
 
+#ifdef TCLTL_BUILD
+  #define TCLTL_API SPOT_HELPER_DLL_EXPORT
+#else
+  #define TCLTL_API SPOT_HELPER_DLL_IMPORT
+#endif
+
 struct tc_model_details;
 typedef std::shared_ptr<tc_model_details> tc_model_details_ptr;
 
-class tc_model final
+class TCLTL_API tc_model final
 {
 private:
   tc_model_details_ptr priv_;
