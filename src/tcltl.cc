@@ -17,6 +17,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+// A lot of code in this file is inspired from Spot's interface
+// with LTSmin, as seen in Spot's spot/ltsmin/ltsmin.cc file.
+
 #include <iostream>
 
 #include <tchecker/parsing/parsing.hh>
@@ -25,14 +29,14 @@
 #include <tchecker/ts/allocators.hh>
 #include <tchecker/ts/builder.hh>
 
-#include <spot/kripke/kripke.hh>
 #include <spot/misc/fixpool.hh>
 #include <spot/twaalgos/dot.hh>
-#include <spot/tl/apcollect.hh>
 #include <spot/tl/parse.hh>
 #include <spot/tl/print.hh>
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/emptiness.hh>
+
+#include "tcltl.hh"
 
 typedef tchecker::zg::ta::elapsed_extraLUplus_local_t zg_t;
 typedef zg_t::transition_t transition_t;
@@ -50,6 +54,25 @@ struct one_prop
 
 typedef std::vector<one_prop> prop_list;
 
+
+struct tc_model_details final
+{
+public:
+  const tchecker::parsing::system_declaration_t* sysdecl;
+  tchecker::zg::ta::model_t* model;
+
+  tc_model_details(tchecker::parsing::system_declaration_t const * sys,
+                  tchecker::zg::ta::model_t* m)
+    : sysdecl(sys), model(m)
+  {
+  }
+
+  ~tc_model_details()
+  {
+    delete model;
+    delete sysdecl;
+  }
+};
 
 
 struct tcltl_state final: public spot::state
@@ -181,6 +204,9 @@ class tcltl_kripke final: public spot::kripke
   typedef tchecker::ts::allocator_t<state_allocator_t, transition_allocator_t>
     allocator_t;
   typedef tchecker::ts::builder_ok_t<zg_t::ts_t, allocator_t> builder_t;
+  // Keep a shared pointer to the model and system so that they are
+  // not deallocated before this Kripke structure.
+  tc_model_details_ptr tcmd_;
   zg_t::ts_t ts_;
   mutable allocator_t allocator_;
   mutable builder_t builder_;
@@ -191,12 +217,13 @@ class tcltl_kripke final: public spot::kripke
 public:
 
   tcltl_kripke(tchecker::gc_t& gc,
-               tchecker::zg::ta::model_t& model,
+               tc_model_details_ptr tcmd,
                const spot::bdd_dict_ptr& dict,
                const prop_list* ps, spot::formula dead)
     : kripke(dict),
-      ts_(model),
-      allocator_(gc, std::make_tuple(model, 100000), std::tuple<>()),
+      tcmd_(tcmd),
+      ts_(*tcmd->model),
+      allocator_(gc, std::make_tuple(*tcmd->model, 100000), std::tuple<>()),
       builder_(ts_, allocator_),
       ps_(ps),
       statepool_(sizeof(tcltl_state))
@@ -601,99 +628,88 @@ convert_aps(const spot::atomic_prop_set* aps,
     throw std::runtime_error(err.str());
 }
 
-class tc_model final
+tc_model::tc_model(tc_model_details* tcm)
+  : priv_(tcm)
 {
-  tchecker::parsing::system_declaration_t const * sysdecl_;
-  tchecker::zg::ta::model_t* model_;
+}
 
-  tc_model(tchecker::parsing::system_declaration_t const * sys,
-           tchecker::zg::ta::model_t* m)
-    : sysdecl_(sys), model_(m)
-  {
-  }
+tc_model tc_model::load(const std::string filename)
+{
+  tchecker::log_t log(std::cerr);
+  auto* sysdecl = tchecker::parsing::parse_system_declaration(filename, log);
 
-public:
-  ~tc_model()
-  {
-    delete model_;
-    delete sysdecl_;
-  }
+  if (sysdecl == nullptr)
+    throw std::runtime_error("system declaration could not be built");
+  auto tcm = new tc_model_details(sysdecl,
+                                  new tchecker::zg::ta::model_t(*sysdecl, log));
+  return tc_model(tcm);
+}
 
-  static tc_model load(const std::string filename)
-  {
-    tchecker::log_t log(std::cerr);
-    auto* sysdecl = tchecker::parsing::parse_system_declaration(filename, log);
-
-    if (sysdecl == nullptr)
-      throw std::runtime_error("system declaration could not be built");
-    return tc_model(sysdecl, new tchecker::zg::ta::model_t(*sysdecl, log));
-  }
-
-  void dump_info(std::ostream& out) const
-  {
-    auto& s = model_->system();
-    // auto const& events = s.events();
-    // for (const auto& e: events)
-    //   out << "evt " << events.key(e) << '=' << events.value(e) << '\n';
-    const auto& process_index = s.processes();
-    bool first = true;
-    for (const auto* loc: s.locations())
-      {
-        if (first)
-          {
-            std::cout
-              << "The following location(s) may be used in the formula:\n";
-            first = false;
-          }
-        std::string const & process_name = process_index.value(loc->pid());
-        out << "- " // << loc->id() << '='
-            << process_name << "." << loc->name() << '\n';
+void tc_model::dump_info(std::ostream& out) const
+{
+  auto& s = priv_->model->system();
+  // auto const& events = s.events();
+  // for (const auto& e: events)
+  //   out << "evt " << events.key(e) << '=' << events.value(e) << '\n';
+  const auto& process_index = s.processes();
+  bool first = true;
+  for (const auto* loc: s.locations())
+    {
+      if (first)
+        {
+          std::cout
+            << "The following location(s) may be used in the formula:\n";
+          first = false;
         }
-    auto const& intvars = model_->system_integer_variables();
-    auto const& idx = intvars.index();
-    first = true;
-    for (const auto v: idx)
-      {
-        if (first)
-          {
-            std::cout
-              << "The following variable(s) may be used in the formula:\n";
-            first = false;
-          }
-        auto id = idx.key(v);
-        tchecker::intvar_info_t const & info = intvars.info(id);
-        out << "- " << /* id << '=' << */ idx.value(v)
-            << " (" << info.min() << ".." << info.max() << ")\n";
-      }
-  }
+      std::string const & process_name = process_index.value(loc->pid());
+      out << "- " // << loc->id() << '='
+          << process_name << "." << loc->name() << '\n';
+    }
+  auto const& intvars = priv_->model->system_integer_variables();
+  auto const& idx = intvars.index();
+  first = true;
+  for (const auto v: idx)
+    {
+      if (first)
+        {
+          std::cout
+            << "The following variable(s) may be used in the formula:\n";
+          first = false;
+        }
+      auto id = idx.key(v);
+      tchecker::intvar_info_t const & info = intvars.info(id);
+      out << "- " << /* id << '=' << */ idx.value(v)
+          << " (" << info.min() << ".." << info.max() << ")\n";
+    }
+}
 
-  spot::kripke_ptr kripke(tchecker::gc_t& gc,
-                          const spot::atomic_prop_set* to_observe,
-                          spot::bdd_dict_ptr dict,
-                          spot::formula dead = spot::formula::tt())
-  {
-    prop_list* ps = new prop_list;
-    try
-      {
-        convert_aps(to_observe, *model_, dict, dead, *ps);
-      }
-    catch (const std::runtime_error&)
-      {
-        delete ps;
-        dict->unregister_all_my_variables(ps);
-        throw;
-      }
-    auto res = std::make_shared<tcltl_kripke>(gc, *model_, dict, ps, dead);
-    // All atomic propositions have been registered to the bdd_dict
-    // for iface, but we also need to add them to the automaton so
-    // twa::ap() works.
-    for (auto ap: *to_observe)
-      res->register_ap(ap);
-    if (dead.is(spot::op::ap))
-      res->register_ap(dead);
-    return res;
-  }
-};
+spot::kripke_ptr tc_model::kripke(tchecker::gc_t& gc,
+                                  const spot::atomic_prop_set* to_observe,
+                                  spot::bdd_dict_ptr dict,
+                                  spot::formula dead)
+{
+  prop_list* ps = new prop_list;
+  try
+    {
+      convert_aps(to_observe, *priv_->model, dict, dead, *ps);
+    }
+  catch (const std::runtime_error&)
+    {
+      dict->unregister_all_my_variables(ps);
+      delete ps;
+      throw;
+    }
+  auto res =
+    std::make_shared<tcltl_kripke>(gc, priv_, dict, ps, dead);
+  // All atomic propositions have been registered to the bdd_dict
+  // for iface, but we also need to add them to the automaton so
+  // twa::ap() works.
+  for (auto ap: *to_observe)
+    res->register_ap(ap);
+  if (dead.is(spot::op::ap))
+    res->register_ap(dead);
+  return res;
+}
 
 
 int main(int argc, char * argv[])

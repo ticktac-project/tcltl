@@ -19,8 +19,9 @@
 
 EXTRA_DIST = tools/gitlog-to-changelog
 
+AM_CPPFLAGS = -I$(srcdir)/src
 bin_PROGRAMS = tcltl
-tcltl_SOURCES = src/tcltl.cc
+tcltl_SOURCES = src/tcltl.cc src/tcltl.hh
 tcltl_LDADD = -llibtchecker -lspot -lbddx -lpthread
 
 
