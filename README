@@ -1,0 +1,39 @@
+TCLTL is a model checker for timed-automata.
+
+It is based on TChecker (for generating the state-space) and Spot (for
+LTL model checking), and developped as part of the tick-tac project.
+
+
+To compile:
+
+  1. Install a recent release of Spot
+
+     https://spot.lrde.epita.fr/install.html
+
+     In what follows, we assume you have run "make install" and that
+     Spot is installed in /usr/local/ (the default destination).
+
+  2. Install the git version of TChecker
+
+     https://github.com/ticktac-project/tchecker/wiki/Installation-of-TChecker
+
+     In what follows, we assume you have run "make install" and that
+     TChecker is also installed in /usr/local/.
+
+  3. Finally, compile and install tcltl:
+
+     If you start from a git checkout, do
+
+     $ cd tcltl
+     $ autoreconf -vfi
+     $ ./configure
+     $ make
+     $ make install
+
+     If you start from a tarball, do
+
+     $ tar zxvf tcltl-X.Y.tar.gz
+     $ cd tcltl-X.Y
+     $ ./configure
+     $ make
+     $ make install
