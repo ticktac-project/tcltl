@@ -20,9 +20,9 @@
 EXTRA_DIST = tools/gitlog-to-changelog
 
 AM_CPPFLAGS = -I$(srcdir)/src
-bin_PROGRAMS = tcltl
-tcltl_SOURCES = src/tcltl.cc src/tcltl.hh
-tcltl_LDADD = -llibtchecker -lspot -lbddx -lpthread
+bin_PROGRAMS = bin/tcltl
+bin_tcltl_SOURCES = bin/main.cc src/tcltl.cc src/tcltl.hh
+bin_tcltl_LDADD = -llibtchecker -lspot -lbddx -lpthread
 
 
 # We write the commit message so that they can be used to build a
