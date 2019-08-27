@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_PREREQ([2.61])
+AC_PREREQ([2.63])
 AC_INIT([tcltl], [0.1.dev], [adl@lrde.epita.fr])
 AC_CONFIG_AUX_DIR([tools])
 AC_CONFIG_MACRO_DIR([m4])
@@ -26,12 +26,20 @@ AM_INIT_AUTOMAKE([1.11 gnu tar-ustar color-tests parallel-tests subdir-objects])
 AC_CONFIG_HEADERS([config.h])dnl Private config, not to be used in .hh files.
 
 AC_PROG_CC
+gl_EARLY
 AM_PROG_CC_C_O
 AC_PROG_CXX
 
 # Decrease verbosity when passing argument V=0
 AM_SILENT_RULES([no])
 
+# Activate C11 for gnulib tests
+AX_CHECK_COMPILE_FLAG([-std=c11], [CFLAGS="$CFLAGS -std=c11"])
+
+gl_INIT
+
+AX_CHECK_COMPILE_FLAG([-Werror -fvisibility=hidden],
+  [CFLAGS="$CFLAGS -fvisibility=hidden"])
 AC_LANG(C++)
 AX_CHECK_COMPILE_FLAG([-Werror -fvisibility=hidden],
   [CXXFLAGS="$CXXFLAGS -fvisibility=hidden"
@@ -78,5 +86,5 @@ fi
 
 LT_INIT([win32-dll])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile])
 AC_OUTPUT

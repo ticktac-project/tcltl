@@ -17,7 +17,9 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-EXTRA_DIST = tools/gitlog-to-changelog
+SUBDIRS = lib .
+
+EXTRA_DIST = tools/gitlog-to-changelog m4/gnulib-cache.m4
 
 AM_CPPFLAGS = -I$(srcdir)/src
 
@@ -26,7 +28,8 @@ src_libtcltl_la_SOURCES = src/tcltl.cc src/tcltl.hh
 
 bin_PROGRAMS = bin/tcltl
 bin_tcltl_SOURCES = bin/main.cc
-bin_tcltl_LDADD = src/libtcltl.la -lspot -lbddx -llibtchecker -lpthread
+bin_tcltl_LDADD = src/libtcltl.la lib/libgnu.a \
+	-lspot -lbddx -llibtchecker -lpthread
 
 
 # We write the commit message so that they can be used to build a
