@@ -30,7 +30,7 @@ bin_PROGRAMS = bin/tcltl
 bin_tcltl_SOURCES = bin/main.cc
 bin_tcltl_LDADD = src/libtcltl.la lib/libgnu.a \
 	-lspot -lbddx -llibtchecker -lpthread
-
+bin_tcltl_CPPFLAGS = $(AM_CPPFLAGS) -Ilib -I$(top_srcdir)/lib
 
 # We write the commit message so that they can be used to build a
 # ChangeLog file that we distribute, following the GNU conventions.
