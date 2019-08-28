@@ -19,7 +19,7 @@
 
 SUBDIRS = lib .
 
-EXTRA_DIST = tools/gitlog-to-changelog m4/gnulib-cache.m4
+EXTRA_DIST = tools/gitlog-to-changelog m4/gnulib-cache.m4 $(TESTS)
 
 AM_CPPFLAGS = -I$(srcdir)/src
 
@@ -31,6 +31,16 @@ bin_tcltl_SOURCES = bin/main.cc
 bin_tcltl_LDADD = src/libtcltl.la lib/libgnu.a \
 	-lspot -lbddx -llibtchecker -lpthread
 bin_tcltl_CPPFLAGS = $(AM_CPPFLAGS) -Ilib -I$(top_srcdir)/lib
+
+# Explicitly set it to avoid default value ".test"
+TEST_EXTENSIONS =
+LOG_COMPILER = tests/run
+check_SCRIPTS = tests/defs tests/run
+TESTS = tests/errcli.test
+
+# Remove the test directories created in by tests/defs
+distclean-local:
+	find . -name '*.dir' -type d -print | xargs rm -rf
 
 # We write the commit message so that they can be used to build a
 # ChangeLog file that we distribute, following the GNU conventions.

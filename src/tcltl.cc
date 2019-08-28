@@ -283,7 +283,7 @@ public:
         }
       else
         {
-          throw std::runtime_error("multiple initial states not supported");
+          throw std::runtime_error("Multiple initial states not supported.");
         }
     return res;
   }
@@ -634,7 +634,7 @@ tc_model tc_model::load(const std::string filename)
   auto* sysdecl = tchecker::parsing::parse_system_declaration(filename, log);
 
   if (sysdecl == nullptr)
-    throw std::runtime_error("system declaration could not be built");
+    throw std::runtime_error("System declaration could not be built.");
   auto tcm = new tc_model_details(sysdecl,
                                   new tchecker::zg::ta::model_t(*sysdecl, log));
   return tc_model(tcm);

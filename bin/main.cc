@@ -92,10 +92,12 @@ static std::string model_filename;
 
 static void parse_formula(std::string f)
 {
+  if (!input_formula.empty())
+    error(2, 0, "Only one formula may be specified.");
   input_formula = f;
   spot::parsed_formula pf = spot::parse_infix_psl(f);
   if (pf.format_errors(std::cerr))
-    error(1, 0, "error parsing formula");
+    error(2, 0, "Error parsing formula.");
   formula_neg = spot::formula::Not(pf.f);
 }
 
@@ -112,6 +114,8 @@ parse_opt(int key, char* arg, struct argp_state* state)
       parse_formula(arg);
       break;
     case 'm':
+      if (!model_filename.empty())
+        error(2, 0, "Only one model may be specified.");
       model_filename = arg;
       break;
     case 'q':
@@ -140,7 +144,7 @@ parse_opt(int key, char* arg, struct argp_state* state)
       else if (input_formula.empty())
         parse_formula(arg);
       else
-        error(2, 0, "too many arguments: %s", arg);
+        error(2, 0, "Too many arguments: %s", arg);
       break;
     default:
       return ARGP_ERR_UNKNOWN;
@@ -261,7 +265,7 @@ int main(int argc, char * argv[])
   // (like disk full or broken pipe with SIGPIPE ignored).
   std::cout.flush();
   if (!std::cout)
-    error(2, 0, "error writing to standard output");
+    error(2, 0, "Error writing to standard output.");
 
   return exit_code;
 }

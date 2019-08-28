@@ -86,5 +86,6 @@ fi
 
 LT_INIT([win32-dll])
 
-AC_CONFIG_FILES([Makefile lib/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile tests/defs])
+AC_CONFIG_FILES([tests/run], [chmod +x tests/run])
 AC_OUTPUT

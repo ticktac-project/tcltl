@@ -1,0 +1,64 @@
+# -*- mode: shell-script; coding: utf-8 -*-
+# Copyright (C) 2019 Laboratoire de Recherche et Développement de
+# l'Epita (LRDE).
+#
+# This file is part of TCLTL, a model checker for timed automata.
+#
+# TCLTL is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# TCLTL is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Ensure we are running from the right directory.
+test -f tests/defs || {
+   echo "tests/defs: not found in current directory" 1>&2
+   exit 1
+}
+
+# If srcdir is not set, then we are not running from `make check'.
+if test -z "$srcdir"; then
+   # compute $srcdir.
+   srcdir=`echo "$0" | sed -e 's,/tests/[^\\/]*$,,'`
+   test $srcdir = $0 && srcdir=.
+fi
+
+# Ensure $srcdir is set correctly.  It should point to the root directory.
+test -f $srcdir/tests/defs.in || {
+   echo "$srcdir/tests/defs.in not found, check \$srcdir" 1>&2
+   exit 1
+}
+
+echo "== Running test $0"
+
+me=`echo "$0" | sed -e 's,.*[\\/],,g;s/\.test$//'`
+
+testSubDir=./tests/$me.dir
+chmod -R a+rwx $testSubDir > /dev/null 2>&1
+rm -rf $testSubDir > /dev/null 2>&1
+mkdir -p $testSubDir
+cd $testSubDir
+
+# Adjust srcdir now that we are in a subdirectory.  We still want
+# $srcdir to point to the source directory corresponding to the build
+# directory that contains $testSubDir.
+case $srcdir in
+  [\\/$]* | ?:[\\/]* );;
+  *) srcdir=../$srcdir
+esac
+
+DOT='@DOT@'
+top_srcdir='@abs_top_srcdir@'
+
+# The test cases assume these variables are undefined
+unset SPOT_DOTEXTRA
+unset SPOT_DOTDEFAULT
+
+set -x
