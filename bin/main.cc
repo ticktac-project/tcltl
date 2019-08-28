@@ -43,9 +43,10 @@ Exit status:\n\
 // We disable this option as well as -V (because --version doesn't need
 // a short version).
 enum {
-  OPT_HELP = 1,
-  OPT_VARS,
-  OPT_VERSION,
+      OPT_DEAD = 256,
+      OPT_HELP,
+      OPT_VARS,
+      OPT_VERSION,
 };
 
 static const argp_option options[] =
@@ -62,6 +63,12 @@ static const argp_option options[] =
       "output the result in GraphViz format" },
     { "vars", OPT_VARS, nullptr, 0,
       "list variables in the model and exit", 0 },
+    { nullptr, 0, nullptr, 0, "Semantic options:", 3 },
+    { "dead-loop", OPT_DEAD, "true|false|\"ap\"", 0,
+      "handling of states without successors in the model: "
+      "(false) ignore them, (true) loop on them, (\"ap\") loop and"
+      " label them with an atomic proposition that may be used in "
+      " the formula.  The default is true." },
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
     { "version", OPT_VERSION, nullptr, 0, "print program version", 0 },
     { "help", OPT_HELP, nullptr, 0, "print this help", 0 },
@@ -90,6 +97,7 @@ static output_type_t output_type = OUTPUT_STD;
 static std::string input_formula;
 static spot::formula formula_neg;
 static std::string model_filename;
+static spot::formula dead_prop = spot::formula::tt();
 
 static void parse_formula(std::string f)
 {
@@ -121,6 +129,14 @@ parse_opt(int key, char* arg, struct argp_state* state)
       break;
     case 'q':
       output_type = OUTPUT_QUIET;
+      break;
+    case OPT_DEAD:
+      if (!strcasecmp(arg, "true"))
+        dead_prop = spot::formula::tt();
+      else if (!strcasecmp(arg, "false"))
+        dead_prop = spot::formula::ff();
+      else
+        dead_prop = spot::formula::ap(arg);
       break;
     case OPT_HELP:
       argp_state_help(state, state->out_stream,
@@ -176,7 +192,7 @@ static int run()
   if (!formula_neg && output_type == OUTPUT_DOT)
     {
       spot::atomic_prop_set ap;
-      auto k = m.kripke(gc, &ap, dict);
+      auto k = m.kripke(gc, &ap, dict, dead_prop);
       gc.start();
       k->set_named_prop("automaton-name", new std::string(model_filename));
       spot::print_dot(std::cout, k, ".kvA");
@@ -187,7 +203,7 @@ static int run()
   spot::twa_graph_ptr af = spot::translator(dict).run(formula_neg);
   spot::atomic_prop_set ap;
   spot::atomic_prop_collect(formula_neg, &ap);
-  spot::twa_ptr k = m.kripke(gc, &ap, dict);
+  spot::twa_ptr k = m.kripke(gc, &ap, dict, dead_prop);
   gc.start();
   if (output_type == OUTPUT_DOT)
     {

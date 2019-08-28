@@ -1,0 +1,41 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) 2019 Laboratoire de Recherche et Développement de
+# l'Epita (LRDE).
+#
+# This file is part of TCLTL, a model checker for timed automata.
+#
+# TCLTL is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# TCLTL is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. tests/defs
+set -e
+
+# A model without edge.
+cat >model <<EOF
+system:finite
+event:e
+process:P
+location:P:I{initial:}
+EOF
+
+tcltl model '!P.I' >out && exit 1
+grep 'violated' out
+tcltl --dead-loop=true model '!P.I' >out && exit 1
+grep 'violated' out
+test 0 -eq "`grep -c dead out`"
+tcltl --dead-loop=false model '!P.I' >out
+grep 'satisfied' out
+tcltl --dead-loop=dead model '!P.I' >out && exit 1
+grep 'violated' out
+test 2 -eq "`grep -c dead out`"

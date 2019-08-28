@@ -38,6 +38,7 @@ LOG_COMPILER = tests/run
 check_SCRIPTS = tests/defs tests/run
 TESTS = \
   tests/basic.test \
+  tests/dead.test \
   tests/errcli.test \
   tests/errclout.test
 
