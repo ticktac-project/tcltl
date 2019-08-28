@@ -22,6 +22,7 @@
 #include "argp.h"
 #include "closeout.h"
 #include "error.h"
+#include "exitfail.h"
 
 #include <spot/twaalgos/dot.hh>
 #include <spot/tl/parse.hh>
@@ -240,6 +241,7 @@ static int run()
 
 int main(int argc, char * argv[])
 {
+  exit_failure = 2;
   argp_program_bug_address = "<" PACKAGE_BUGREPORT ">";
   // Simplify the program name, because argp() uses it to report
   // errors and display help text.

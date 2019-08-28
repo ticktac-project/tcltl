@@ -36,7 +36,9 @@ bin_tcltl_CPPFLAGS = $(AM_CPPFLAGS) -Ilib -I$(top_srcdir)/lib
 TEST_EXTENSIONS =
 LOG_COMPILER = tests/run
 check_SCRIPTS = tests/defs tests/run
-TESTS = tests/errcli.test
+TESTS = \
+  tests/errcli.test \
+  tests/errclout.test
 
 # Remove the test directories created in by tests/defs
 distclean-local:
