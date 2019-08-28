@@ -1,0 +1,117 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) 2019 Laboratoire de Recherche et Développement de
+# l'Epita (LRDE).
+#
+# This file is part of TCLTL, a model checker for timed automata.
+#
+# TCLTL is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# TCLTL is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. tests/defs
+set -e
+
+# this was generated with "examples/critical-region.sh 1" in tchecker
+cat >model <<EOF
+system:critical_region_1_10
+event:tau
+event:enter1
+event:exit1
+int:1:0:1:0:id
+process:counter
+location:counter:I{initial:}
+location:counter:C{}
+edge:counter:I:C:tau{provided: id==0 : do: id=1}
+edge:counter:C:C:tau{provided: id<1 : do: id=id+1}
+edge:counter:C:C:tau{provided: id==1 : do: id=1}
+process:arbiter1
+location:arbiter1:req{initial:}
+location:arbiter1:ack{}
+edge:arbiter1:req:ack:enter1{provided: id==1 : do: id=0}
+edge:arbiter1:ack:req:exit1{do: id=1}
+process:prodcell1
+clock:1:x1
+location:prodcell1:not_ready{initial:}
+location:prodcell1:testing{invariant: x1<=10}
+location:prodcell1:requesting{}
+location:prodcell1:critical{invariant: x1<=20}
+location:prodcell1:testing2{invariant: x1<=10}
+location:prodcell1:safe{}
+location:prodcell1:error{}
+edge:prodcell1:not_ready:testing:tau{provided: x1<=20 : do: x1=0}
+edge:prodcell1:testing:not_ready:tau{provided: x1>=10 : do: x1=0}
+edge:prodcell1:testing:requesting:tau{provided: x1<=9}
+edge:prodcell1:requesting:critical:enter1{do: x1=0}
+edge:prodcell1:critical:error:tau{provided: x1>=20}
+edge:prodcell1:critical:testing2:exit1{provided: x1<=9 : do: x1=0}
+edge:prodcell1:testing2:error:tau{provided: x1>=10}
+edge:prodcell1:testing2:safe:tau{provided: x1<=9}
+sync:arbiter1@enter1:prodcell1@enter1
+sync:arbiter1@exit1:prodcell1@exit1
+EOF
+
+tcltl model >out
+cat >expected <<EOF
+No LTL formula specified.
+The following location(s) may be used in the formula:
+- counter.I
+- counter.C
+- arbiter1.req
+- arbiter1.ack
+- prodcell1.not_ready
+- prodcell1.testing
+- prodcell1.requesting
+- prodcell1.critical
+- prodcell1.testing2
+- prodcell1.safe
+- prodcell1.error
+The following variable(s) may be used in the formula:
+- id (0..1)
+EOF
+diff expected out
+
+# GraphViz output of the Kripke structure
+test 43 -eq `tcltl -d model | wc -l`
+
+# unsatisfied formula
+tcltl model 'G(arbiter1.req -> F(arbiter1.ack))' >out && exit 1
+test $? -eq 1
+grep 'formula is violated' out
+grep Prefix out
+grep Cycle out
+
+tcltl model --dot 'G(arbiter1.req -> F(arbiter1.ack))' >out && exit 1
+test $? -eq 1
+grep 'digraph.*counterexample' out
+
+tcltl --dot -f 'G(arbiter1.req -> F(arbiter1.ack))' model >out && exit 1
+test $? -eq 1
+grep 'digraph.*counterexample' out
+
+tcltl --dot 'G(arbiter1.req -> F(arbiter1.ack))' -m model >out && exit 1
+test $? -eq 1
+grep 'digraph.*counterexample' out
+
+tcltl -q 'G(arbiter1.req -> F(arbiter1.ack))' -m model >out && exit 1
+test $? -eq 1
+test -z "`cat out`"
+
+# satisfied formula
+tcltl model 'G(arbiter1.req | arbiter1.ack)' >out
+grep 'formula is satisfied' out
+
+tcltl -q model 'G(arbiter1.req | arbiter1.ack)' >out
+test -z "`cat out`"
+
+tcltl -d model 'G(arbiter1.req | arbiter1.ack)' >out
+grep 'digraph.*satisfies' out
