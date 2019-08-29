@@ -23,6 +23,7 @@
 #include "closeout.h"
 #include "error.h"
 #include "exitfail.h"
+#include "argmatch.h"
 
 #include <spot/twaalgos/dot.hh>
 #include <spot/tl/parse.hh>
@@ -68,7 +69,10 @@ static const argp_option options[] =
       "handling of states without successors in the model: "
       "(false) ignore them, (true) loop on them, (\"ap\") loop and"
       " label them with an atomic proposition that may be used in "
-      " the formula.  The default is true." },
+      "the formula.  The default is true." },
+    { "zone-semantics", 'z', "SEMANTICS", 0,
+      "specify the zone semantics to use (\"elapsed:extraLU+l\" "
+      "by default)", 0 },
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
     { "version", OPT_VERSION, nullptr, 0, "print program version", 0 },
     { "help", OPT_HELP, nullptr, 0, "print this help", 0 },
@@ -77,6 +81,51 @@ static const argp_option options[] =
     { "usage", OPT_HELP, nullptr, OPTION_HIDDEN, nullptr, 0 },
     { nullptr, 0, nullptr, 0, nullptr, 0 }
   };
+
+static char const *const zone_sem_args[] = {
+   "elapsed:NOextra",
+   "elapsed:extraLUg",
+   "elapsed:extraLUl",
+   "elapsed:extraLU+g",
+   "elapsed:extraLU+l",
+   "elapsed:extraMg",
+   "elapsed:extraMl",
+   "elapsed:extraM+g",
+   "elapsed:extraM+l",
+   "non-elapsed:NOextra",
+   "non-elapsed:extraLUg",
+   "non-elapsed:extraLUl",
+   "non-elapsed:extraLU+g",
+   "non-elapsed:extraLU+l",
+   "non-elapsed:extraMg",
+   "non-elapsed:extraMl",
+   "non-elapsed:extraM+g",
+   "non-elapsed:extraM+l",
+   nullptr
+};
+
+static zg_zone_semantics const zone_sem_vals[] = {
+   elapsed_no_extrapolation,
+   elapsed_extraLU_global,
+   elapsed_extraLU_local,
+   elapsed_extraLUplus_global,
+   elapsed_extraLUplus_local,
+   elapsed_extraM_global,
+   elapsed_extraM_local,
+   elapsed_extraMplus_global,
+   elapsed_extraMplus_local,
+   non_elapsed_no_extrapolation,
+   non_elapsed_extraLU_global,
+   non_elapsed_extraLU_local,
+   non_elapsed_extraLUplus_global,
+   non_elapsed_extraLUplus_local,
+   non_elapsed_extraM_global,
+   non_elapsed_extraM_local,
+   non_elapsed_extraMplus_global,
+   non_elapsed_extraMplus_local,
+};
+ARGMATCH_VERIFY(zone_sem_args, zone_sem_vals);
+
 
 static void
 display_version(FILE *stream, struct argp_state*)
@@ -98,6 +147,7 @@ static std::string input_formula;
 static spot::formula formula_neg;
 static std::string model_filename;
 static spot::formula dead_prop = spot::formula::tt();
+static zg_zone_semantics zone_sem = elapsed_extraLUplus_local;
 
 static void parse_formula(std::string f)
 {
@@ -129,6 +179,10 @@ parse_opt(int key, char* arg, struct argp_state* state)
       break;
     case 'q':
       output_type = OUTPUT_QUIET;
+      break;
+    case 'z':
+      zone_sem = XARGMATCH("--zone-semantics", arg,
+                           zone_sem_args, zone_sem_vals);
       break;
     case OPT_DEAD:
       if (!strcasecmp(arg, "true"))
@@ -192,7 +246,7 @@ static int run()
   if (!formula_neg && output_type == OUTPUT_DOT)
     {
       spot::atomic_prop_set ap;
-      auto k = m.kripke(gc, &ap, dict, dead_prop);
+      auto k = m.kripke(gc, &ap, dict, dead_prop, zone_sem);
       gc.start();
       k->set_named_prop("automaton-name", new std::string(model_filename));
       spot::print_dot(std::cout, k, ".kvA");
@@ -203,7 +257,7 @@ static int run()
   spot::twa_graph_ptr af = spot::translator(dict).run(formula_neg);
   spot::atomic_prop_set ap;
   spot::atomic_prop_collect(formula_neg, &ap);
-  spot::twa_ptr k = m.kripke(gc, &ap, dict, dead_prop);
+  spot::twa_ptr k = m.kripke(gc, &ap, dict, dead_prop, zone_sem);
   gc.start();
   if (output_type == OUTPUT_DOT)
     {

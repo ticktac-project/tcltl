@@ -22,6 +22,7 @@
 // with LTSmin, as seen in Spot's spot/ltsmin/ltsmin.cc file.
 
 #include <iostream>
+#include <cassert>
 
 #include <tchecker/parsing/parsing.hh>
 #include <tchecker/utils/log.hh>
@@ -33,8 +34,6 @@
 
 #include "tcltl.hh"
 
-typedef tchecker::zg::ta::elapsed_extraLUplus_local_t zg_t;
-typedef zg_t::transition_t transition_t;
 
 typedef enum { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE, OP_AT } relop;
 
@@ -69,10 +68,10 @@ public:
   }
 };
 
-
+template <typename STATE_PTR>
 struct tcltl_state final: public spot::state
 {
-  tcltl_state(spot::fixed_size_pool* p, zg_t::shared_state_ptr_t zg)
+  tcltl_state(spot::fixed_size_pool* p, STATE_PTR zg)
     : pool_(p), hash_val_(hash_value(*zg)), count_(1), zg_state_(zg)
   {
   }
@@ -110,7 +109,7 @@ struct tcltl_state final: public spot::state
     return *zg_state() != *o->zg_state();
   }
 
-  zg_t::shared_state_ptr_t zg_state() const
+  STATE_PTR zg_state() const
   {
     return zg_state_;
   }
@@ -123,7 +122,7 @@ private:
   spot::fixed_size_pool* pool_;
   unsigned hash_val_;
   mutable unsigned count_;
-  zg_t::shared_state_ptr_t zg_state_;
+  STATE_PTR zg_state_;
 };
 
 
@@ -190,19 +189,26 @@ private:
 };
 
 
-
+template <typename ZONE>
 class tcltl_kripke final: public spot::kripke
 {
-  typedef zg_t::state_pool_allocator_t<zg_t::shared_state_t> state_allocator_t;
-  typedef zg_t::transition_singleton_allocator_t<zg_t::transition_t>
-    transition_allocator_t;
-  typedef tchecker::ts::allocator_t<state_allocator_t, transition_allocator_t>
-    allocator_t;
-  typedef tchecker::ts::builder_ok_t<zg_t::ts_t, allocator_t> builder_t;
+  using zg_t = ZONE;
+  using state_t = typename zg_t::shared_state_t;
+  using state_ptr_t = typename zg_t::shared_state_ptr_t;
+  using state_allocator_t =
+    typename zg_t::template state_pool_allocator_t<state_t>;
+  using transition_allocator_t =
+    typename zg_t::template transition_singleton_allocator_t
+    <typename zg_t::transition_t>;
+  using allocator_t =
+    tchecker::ts::allocator_t<state_allocator_t, transition_allocator_t>;
+  using builder_t =
+    tchecker::ts::builder_ok_t<typename zg_t::ts_t, allocator_t>;
+
   // Keep a shared pointer to the model and system so that they are
   // not deallocated before this Kripke structure.
   tc_model_details_ptr tcmd_;
-  zg_t::ts_t ts_;
+  typename zg_t::ts_t ts_;
   mutable allocator_t allocator_;
   mutable builder_t builder_;
   const prop_list* ps_;
@@ -221,7 +227,7 @@ public:
       allocator_(gc, std::make_tuple(*tcmd->model, 100000), std::tuple<>()),
       builder_(ts_, allocator_),
       ps_(ps),
-      statepool_(sizeof(tcltl_state))
+      statepool_(sizeof(tcltl_state<state_ptr_t>))
   {
     // Register the "dead" proposition.  There are three cases to
     // consider:
@@ -267,19 +273,20 @@ public:
     delete ps_;
   }
 
-  virtual tcltl_state* get_init_state() const override
+  virtual tcltl_state<state_ptr_t>* get_init_state() const override
   {
-    tcltl_state* res = nullptr;
+    tcltl_state<state_ptr_t>* res = nullptr;
     bool first = true;
     auto initial_range = builder_.initial();
     for (auto it = initial_range.begin(); ! it.at_end(); ++it)
       if (first)
         {
-          builder_t::state_ptr_t st;
-          builder_t::transition_ptr_t trans;
+          state_ptr_t st;
+          typename builder_t::transition_ptr_t trans;
           std::tie(st, trans) = *it;
           first = false;
-          res = new(statepool_.allocate()) tcltl_state(&statepool_, st);
+          res = new(statepool_.allocate())
+            tcltl_state<state_ptr_t>(&statepool_, st);
         }
       else
         {
@@ -293,16 +300,16 @@ public:
   {
     callback_context* cc = new callback_context;
     cc->pool = &statepool_;
-    auto zs = spot::down_cast<const tcltl_state*>(st);
-    zg_t::shared_state_ptr_t z = zs->zg_state();
+    auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st);
+    state_ptr_t z = zs->zg_state();
     auto outgoing_range = builder_.outgoing(z);
     for (auto it = outgoing_range.begin(); !it.at_end(); ++it)
       {
-        builder_t::state_ptr_t st;
-        builder_t::transition_ptr_t trans;
+        state_ptr_t st;
+        typename builder_t::transition_ptr_t trans;
         std::tie(st, trans) = *it;
-        tcltl_state* res =
-          new(statepool_.allocate()) tcltl_state(&statepool_, st);
+        tcltl_state<state_ptr_t>* res =
+          new(statepool_.allocate()) tcltl_state<state_ptr_t>(&statepool_, st);
         cc->transitions.push_back(res);
       }
 
@@ -335,7 +342,7 @@ public:
   bdd state_condition(const spot::state* st) const override
   {
     bdd cond = bddtrue;
-    auto zs = spot::down_cast<const tcltl_state*>(st)->zg_state();
+    auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st)->zg_state();
     auto& vals = zs->intvars_valuation();
     auto& vloc = zs->vloc();
     for (const one_prop& prop: *ps_)
@@ -383,7 +390,7 @@ public:
   std::string format_state(const spot::state *st) const override
   {
     auto& model = ts_.model();
-    auto zs = spot::down_cast<const tcltl_state*>(st)->zg_state();
+    auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st)->zg_state();
     tchecker::zg::ta::state_outputter_t
       so(model.system_integer_variables().index(),
          model.system_clock_variables().index());
@@ -678,10 +685,48 @@ void tc_model::dump_info(std::ostream& out) const
     }
 }
 
+
+static spot::kripke_ptr
+instantiate_kripke(tchecker::gc_t& gc, tc_model_details_ptr tcmd,
+                   const spot::bdd_dict_ptr& dict, const prop_list* ps,
+                   spot::formula dead, zg_zone_semantics zone_sem)
+{
+#define inst(ZONE) \
+  case ZONE: \
+    return std::make_shared<tcltl_kripke<tchecker::zg::ta::ZONE ## _t>>\
+      (gc, tcmd, dict, ps, dead);
+  switch (zone_sem)
+    {
+      inst(elapsed_no_extrapolation);
+      inst(elapsed_extraLU_global);
+      inst(elapsed_extraLU_local);
+      inst(elapsed_extraLUplus_global);
+      inst(elapsed_extraLUplus_local);
+      inst(elapsed_extraM_global);
+      inst(elapsed_extraM_local);
+      inst(elapsed_extraMplus_global);
+      inst(elapsed_extraMplus_local);
+      inst(non_elapsed_no_extrapolation);
+      inst(non_elapsed_extraLU_global);
+      inst(non_elapsed_extraLU_local);
+      inst(non_elapsed_extraLUplus_global);
+      inst(non_elapsed_extraLUplus_local);
+      inst(non_elapsed_extraM_global);
+      inst(non_elapsed_extraM_local);
+      inst(non_elapsed_extraMplus_global);
+      inst(non_elapsed_extraMplus_local);
+    }
+#undef inst
+  // unreachable
+  assert(0);
+  return nullptr;
+}
+
 spot::kripke_ptr tc_model::kripke(tchecker::gc_t& gc,
                                   const spot::atomic_prop_set* to_observe,
                                   spot::bdd_dict_ptr dict,
-                                  spot::formula dead)
+                                  spot::formula dead,
+                                  zg_zone_semantics zone_sem)
 {
   prop_list* ps = new prop_list;
   try
@@ -694,8 +739,10 @@ spot::kripke_ptr tc_model::kripke(tchecker::gc_t& gc,
       delete ps;
       throw;
     }
-  auto res =
-    std::make_shared<tcltl_kripke>(gc, priv_, dict, ps, dead);
+
+  spot::kripke_ptr res =
+    instantiate_kripke(gc, priv_, dict, ps, dead, zone_sem);
+
   // All atomic propositions have been registered to the bdd_dict
   // for iface, but we also need to add them to the automaton so
   // twa::ap() works.

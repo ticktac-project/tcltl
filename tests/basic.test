@@ -82,6 +82,7 @@ diff expected out
 
 # GraphViz output of the Kripke structure
 test 43 -eq `tcltl -d model | wc -l`
+test 63 -eq `tcltl -d model -z non-elapsed:NOextra | wc -l`
 
 # unsatisfied formula
 tcltl model 'G(arbiter1.req -> F(arbiter1.ack))' >out && exit 1

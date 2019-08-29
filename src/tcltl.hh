@@ -36,6 +36,29 @@
 struct tc_model_details;
 typedef std::shared_ptr<tc_model_details> tc_model_details_ptr;
 
+enum zg_zone_semantics
+  {
+   elapsed_no_extrapolation,
+   elapsed_extraLU_global,
+   elapsed_extraLU_local,
+   elapsed_extraLUplus_global,
+   elapsed_extraLUplus_local,
+   elapsed_extraM_global,
+   elapsed_extraM_local,
+   elapsed_extraMplus_global,
+   elapsed_extraMplus_local,
+   non_elapsed_no_extrapolation,
+   non_elapsed_extraLU_global,
+   non_elapsed_extraLU_local,
+   non_elapsed_extraLUplus_global,
+   non_elapsed_extraLUplus_local,
+   non_elapsed_extraM_global,
+   non_elapsed_extraM_local,
+   non_elapsed_extraMplus_global,
+   non_elapsed_extraMplus_local,
+  };
+
+
 class TCLTL_API tc_model final
 {
 private:
@@ -71,8 +94,11 @@ public:
   // \a dict the BDD dictionary to use
   // \a dead an atomic proposition or constant to use for looping on
   //         dead states
+  // \a zone_sem the zone semantics that TChecker should use
   spot::kripke_ptr kripke(tchecker::gc_t& gc,
                           const spot::atomic_prop_set* to_observe,
                           spot::bdd_dict_ptr dict,
-                          spot::formula dead = spot::formula::tt());
+                          spot::formula dead = spot::formula::tt(),
+                          zg_zone_semantics zone_sem =
+                          elapsed_extraLUplus_local);
 };

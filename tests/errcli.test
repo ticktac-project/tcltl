@@ -93,3 +93,10 @@ grep 'tcltl: Too many arguments: extra' err
 tcltl extra -f formula -m model 2> err && exit 1
 test $? -eq 2
 grep 'tcltl: Too many arguments: extra' err
+
+# invalid zone semantics
+tcltl -zz 2> err && exit 1
+test $? -eq 2
+grep 'tcltl: invalid argument' err
+grep 'Valid arguments are:' err
+
