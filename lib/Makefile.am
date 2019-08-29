@@ -33,6 +33,7 @@
 #  --no-libtool \
 #  --macro-prefix=gl \
 #  --no-vc-files \
+#  argmatch \
 #  argp \
 #  closeout \
 #  error \
@@ -106,6 +107,14 @@ MOSTLYCLEANFILES += alloca.h alloca.h-t
 EXTRA_DIST += alloca.in.h
 
 ## end   gnulib module alloca-opt
+
+## begin gnulib module argmatch
+
+libgnu_a_SOURCES += argmatch.c
+
+EXTRA_DIST += argmatch.h
+
+## end   gnulib module argmatch
 
 ## begin gnulib module argp
 
@@ -449,6 +458,13 @@ EXTRA_libgnu_a_SOURCES += msvc-nothrow.c
 libgnu_a_SOURCES += progname.h progname.c
 
 ## end   gnulib module progname
+
+## begin gnulib module quote
+
+
+EXTRA_DIST += quote.h
+
+## end   gnulib module quote
 
 ## begin gnulib module quotearg
 

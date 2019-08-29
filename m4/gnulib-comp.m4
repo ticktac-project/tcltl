@@ -46,10 +46,12 @@ AC_DEFUN([gl_EARLY],
   # Code from module absolute-header:
   # Code from module alloca:
   # Code from module alloca-opt:
+  # Code from module argmatch:
   # Code from module argp:
   # Code from module c-ctype:
   # Code from module c-strcase:
   # Code from module c-strcaseeq:
+  # Code from module c99:
   # Code from module close-stream:
   # Code from module closeout:
   # Code from module dirname-lgpl:
@@ -85,6 +87,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module multiarch:
   # Code from module nocrash:
   # Code from module progname:
+  # Code from module quote:
   # Code from module quotearg:
   # Code from module quotearg-simple:
   # Code from module rawmemchr:
@@ -95,6 +98,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module snippet/c++defs:
   # Code from module snippet/warn-on-use:
   # Code from module ssize_t:
+  # Code from module std-gnu11:
   # Code from module stdalign:
   # Code from module stdbool:
   # Code from module stddef:
@@ -244,6 +248,7 @@ AC_DEFUN([gl_INIT],
   gl_MULTIARCH
   AC_CHECK_DECLS([program_invocation_name], [], [], [#include <errno.h>])
   AC_CHECK_DECLS([program_invocation_short_name], [], [], [#include <errno.h>])
+  gl_QUOTE
   gl_QUOTEARG
   gl_FUNC_RAWMEMCHR
   if test $HAVE_RAWMEMCHR = 0; then
@@ -485,6 +490,8 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/alloca.c
   lib/alloca.in.h
   lib/arg-nonnull.h
+  lib/argmatch.c
+  lib/argmatch.h
   lib/argp-ba.c
   lib/argp-eexst.c
   lib/argp-fmtstream.c
@@ -664,11 +671,13 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/off_t.m4
   m4/printf.m4
   m4/pthread_rwlock_rdlock.m4
+  m4/quote.m4
   m4/quotearg.m4
   m4/rawmemchr.m4
   m4/size_max.m4
   m4/sleep.m4
   m4/ssize_t.m4
+  m4/std-gnu11.m4
   m4/stdalign.m4
   m4/stdbool.m4
   m4/stddef_h.m4

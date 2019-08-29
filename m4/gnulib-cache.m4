@@ -38,6 +38,7 @@
 #  --no-libtool \
 #  --macro-prefix=gl \
 #  --no-vc-files \
+#  argmatch \
 #  argp \
 #  closeout \
 #  error \
@@ -46,6 +47,7 @@
 # Specification in the form of a few gnulib-tool.m4 macro invocations:
 gl_LOCAL_DIR([])
 gl_MODULES([
+  argmatch
   argp
   closeout
   error
