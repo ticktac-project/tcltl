@@ -175,13 +175,8 @@ public:
   void recycle(ITERATOR start, bdd cond, const spot::state* selfloop)
   {
     kripke_succ_iterator::recycle(cond);
-    // https://github.com/ticktac-project/tchecker/issues/25
-    // start_ = start;
-    start_.~ITERATOR();
-    new(&start_)ITERATOR(start);
-    // pos_ = start;
-    pos_.~ITERATOR();
-    new(&pos_)ITERATOR(start);
+    start_ = start;
+    pos_ = start;
     selfloop_ = selfloop;
     done_ = false;
   }
@@ -201,10 +196,7 @@ private:
 public:
   virtual bool first() override
   {
-    // https://github.com/ticktac-project/tchecker/issues/25
-    // pos_ = start_
-    pos_.~ITERATOR();
-    new(&pos_)ITERATOR(start_);
+    pos_ = start_;
     done_ = false;
     return !is_done();
   }
