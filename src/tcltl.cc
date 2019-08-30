@@ -109,7 +109,11 @@ struct tcltl_state final: public spot::state
     return *zg_state() != *o->zg_state();
   }
 
-  STATE_PTR zg_state() const
+  // It's important not to return a copy, because some TChecker
+  // constructs (like its outgoing_iterators) will hold a reference on
+  // this state.  If we return a temporary copy, the outgoing
+  // iterators we build on this will have stale pointers.
+  STATE_PTR& zg_state() const
   {
     return zg_state_;
   }
@@ -122,70 +126,96 @@ private:
   spot::fixed_size_pool* pool_;
   unsigned hash_val_;
   mutable unsigned count_;
-  STATE_PTR zg_state_;
+  mutable STATE_PTR zg_state_;
 };
 
 
-struct callback_context
-{
-  typedef std::list<spot::state*> transitions_t;
-  transitions_t transitions;
-  int state_size;
-  void* pool;
-  ~callback_context()
-  {
-    for (auto t: transitions)
-      t->destroy();
-  }
-};
-
+// This wrap the TChecker outgoing iterator (the ITERATOR type), but
+// also provide the option to add a self-loop to states when the
+// selfloop argument is given (in this case, the iterator is ignored).
+//
+// We could have separated these behavior into two classes that
+// inherit from spot::kripke_succ_iterator (one for the normal
+// wrapping of TChecker's iterator, another one for the looping case)
+// but that makes recycling harder (by requiring a slow dynamic_cast
+// for type checking).
+template <typename ITERATOR>
 class tcltl_succ_iterator final: public spot::kripke_succ_iterator
 {
 public:
 
-  tcltl_succ_iterator(const callback_context* cc,
-                      bdd cond)
-    : kripke_succ_iterator(cond), cc_(cc)
+  tcltl_succ_iterator(spot::fixed_size_pool& pool, ITERATOR start, bdd cond,
+                      const spot::state* selfloop)
+    : kripke_succ_iterator(cond), pool_(pool), start_(start), pos_(start),
+      selfloop_(selfloop), done_(false)
   {
   }
 
-  void recycle(const callback_context* cc, bdd cond)
+  void recycle(ITERATOR start, bdd cond, const spot::state* selfloop)
   {
-    delete cc_;
-    cc_ = cc;
     kripke_succ_iterator::recycle(cond);
+    // https://github.com/ticktac-project/tchecker/issues/25
+    // start_ = start;
+    start_.~ITERATOR();
+    new(&start_)ITERATOR(start);
+    // pos_ = start;
+    pos_.~ITERATOR();
+    new(&pos_)ITERATOR(start);
+    selfloop_ = selfloop;
+    done_ = false;
   }
 
   ~tcltl_succ_iterator()
   {
-    delete cc_;
+    if (selfloop_)
+      selfloop_->destroy();
   }
 
+private:
+  bool is_done() const
+  {
+    return selfloop_ ? done_ : pos_.at_end();
+  }
+
+public:
   virtual bool first() override
   {
-    it_ = cc_->transitions.begin();
-    return it_ != cc_->transitions.end();
+    // https://github.com/ticktac-project/tchecker/issues/25
+    // pos_ = start_
+    pos_.~ITERATOR();
+    new(&pos_)ITERATOR(start_);
+    done_ = false;
+    return !is_done();
   }
 
   virtual bool next() override
   {
-    ++it_;
-    return it_ != cc_->transitions.end();
+    if (selfloop_)
+      done_ = true;
+    else
+      ++pos_;
+    return !is_done();
   }
 
   virtual bool done() const override
   {
-    return it_ == cc_->transitions.end();
+    return is_done();
   }
 
   virtual spot::state* dst() const override
   {
-    return (*it_)->clone();
+    if (selfloop_)
+      return selfloop_->clone();
+    auto [st, trans] = *pos_;
+    return new(pool_.allocate()) tcltl_state<decltype(st)>(&pool_, st);
   }
 
 private:
-  const callback_context* cc_;
-  callback_context::transitions_t::const_iterator it_;
+  spot::fixed_size_pool& pool_;
+  ITERATOR start_;
+  ITERATOR pos_;
+  const spot::state* selfloop_;
+  bool done_;
 };
 
 
@@ -204,6 +234,8 @@ class tcltl_kripke final: public spot::kripke
     tchecker::ts::allocator_t<state_allocator_t, transition_allocator_t>;
   using builder_t =
     tchecker::ts::builder_ok_t<typename zg_t::ts_t, allocator_t>;
+  using tcltl_succiter_t =
+    tcltl_succ_iterator<typename builder_t::outgoing_iterator_t>;
 
   // Keep a shared pointer to the model and system so that they are
   // not deallocated before this Kripke structure.
@@ -296,46 +328,33 @@ public:
   }
 
   virtual
-  tcltl_succ_iterator* succ_iter(const spot::state* st) const override
+  tcltl_succiter_t* succ_iter(const spot::state* st) const override
   {
-    callback_context* cc = new callback_context;
-    cc->pool = &statepool_;
     auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st);
-    state_ptr_t z = zs->zg_state();
-    auto outgoing_range = builder_.outgoing(z);
-    for (auto it = outgoing_range.begin(); !it.at_end(); ++it)
-      {
-        state_ptr_t st;
-        typename builder_t::transition_ptr_t trans;
-        std::tie(st, trans) = *it;
-        tcltl_state<state_ptr_t>* res =
-          new(statepool_.allocate()) tcltl_state<state_ptr_t>(&statepool_, st);
-        cc->transitions.push_back(res);
-      }
-
+    state_ptr_t& z = zs->zg_state();
+    auto beg = builder_.outgoing(z).begin();
     bdd scond = state_condition(st);
-
-    if (!cc->transitions.empty())
+    bool want_loop = false;
+    if (!beg.at_end())
       {
         scond &= alive_prop;
       }
     else
       {
         scond &= dead_prop;
-        // Add a self-loop to dead-states if we care about these.
-        if (scond != bddfalse)
-          cc->transitions.emplace_back(st->clone());
+        want_loop = scond != bddfalse;
       }
 
     if (iter_cache_)
       {
-        tcltl_succ_iterator* it =
-          spot::down_cast<tcltl_succ_iterator*>(iter_cache_);
-        it->recycle(cc, scond);
+        tcltl_succiter_t* it =
+          spot::down_cast<tcltl_succiter_t*>(iter_cache_);
+        it->recycle(beg, scond, want_loop ? st->clone() : nullptr);
         iter_cache_ = nullptr;
         return it;
       }
-    return new tcltl_succ_iterator(cc, scond);
+    return new tcltl_succiter_t(statepool_, beg, scond,
+                                want_loop ? st->clone() : nullptr);
   }
 
   virtual
