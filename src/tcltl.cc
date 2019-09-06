@@ -312,8 +312,6 @@ public:
         delete iter_cache_;
         iter_cache_ = nullptr;
       }
-    // https://github.com/ticktac-project/tchecker/issues/19
-    allocator_.destruct_all();
     dict_->unregister_all_my_variables(ps_);
     delete ps_;
   }
