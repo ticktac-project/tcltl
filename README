@@ -17,8 +17,13 @@ To compile:
 
      https://github.com/ticktac-project/tchecker/wiki/Installation-of-TChecker
 
+     You need to pass -DLIBTCHECKER_ENABLE_SHARED=1 to cmake so that a
+     shared library is built.
+
      In what follows, we assume you have run "make install" and that
-     TChecker is also installed in /usr/local/.
+     TChecker is also installed in /usr/local/.  Under GNU/Linux you
+     may need to run "sudo ldconfig" after "make install" so that
+     libtchecker.so can be found by ld.so.
 
   3. Finally, compile and install tcltl:
 
