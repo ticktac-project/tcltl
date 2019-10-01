@@ -685,7 +685,7 @@ tc_model::tc_model(tc_model_details* tcm)
 
 tc_model tc_model::load(const std::string filename)
 {
-  tchecker::log_t log(std::cerr);
+  tchecker::log_t log(&std::cerr);
   auto* sysdecl = tchecker::parsing::parse_system_declaration(filename, log);
 
   if (sysdecl == nullptr)
