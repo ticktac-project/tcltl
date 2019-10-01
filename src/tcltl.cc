@@ -219,7 +219,8 @@ public:
     if (selfloop_)
       return selfloop_->clone();
     auto [st, trans] = *pos_;
-    return new(aut_->allocate_state()) tcltl_state<KRIPKE, typename KRIPKE::state_ptr_t>(aut_, st);
+    return new(aut_->allocate_state())
+      tcltl_state<KRIPKE, typename KRIPKE::state_ptr_t>(aut_, st);
   }
 
 private:
@@ -254,6 +255,19 @@ private:
   // Keep a shared pointer to the model and system so that they are
   // not deallocated before this Kripke structure.
   tc_model_details_ptr tcmd_;
+  // TChecker allocators want a garbage collector to enroll()
+  // themselves.  So we need to pass one even if we are never going to
+  // start it.  We don't want to use a global "unused GC", that we
+  // would pass to all instance of tcltl_kripke, because allocators do
+  // not "unenroll()" themselves, so the list of enrolled functions
+  // would grow each time we instantiate a tcltl_kripke.  Therefore we
+  // use a local GC that we destroy at the same time as the
+  // allocator_.
+  tchecker::gc_t unused_gc_;
+  // A queue of state to free, but that we cannot free yet because
+  // some objects (probably TChecker iterators) are still referencing
+  // them.
+  mutable std::deque<state_ptr_t> tofree_;
   typename zg_t::ts_t ts_;
   mutable allocator_t allocator_;
   mutable builder_t builder_;
@@ -263,14 +277,14 @@ private:
   mutable spot::fixed_size_pool statepool_;
 public:
 
-  tcltl_kripke(tchecker::gc_t& gc,
-               tc_model_details_ptr tcmd,
+  tcltl_kripke(tc_model_details_ptr tcmd,
                const spot::bdd_dict_ptr& dict,
                const prop_list* ps, spot::formula dead)
     : kripke(dict),
       tcmd_(tcmd),
       ts_(*tcmd->model),
-      allocator_(gc, std::make_tuple(*tcmd->model, 100000), std::tuple<>()),
+      allocator_(unused_gc_,
+                 std::make_tuple(*tcmd->model, 100000), std::tuple<>()),
       builder_(ts_, allocator_),
       ps_(ps),
       statepool_(sizeof(tcltl_state_t))
@@ -313,12 +327,14 @@ public:
         delete iter_cache_;
         iter_cache_ = nullptr;
       }
+    tofree_.clear();
     dict_->unregister_all_my_variables(ps_);
     delete ps_;
   }
 
   virtual const tcltl_state_t* get_init_state() const override
   {
+    check_tofree();
     tcltl_state_t* res = nullptr;
     bool first = true;
     auto initial_range = builder_.initial();
@@ -341,6 +357,7 @@ public:
   virtual
   tcltl_succiter_t* succ_iter(const spot::state* st) const override
   {
+    check_tofree();
     auto zs = spot::down_cast<const tcltl_state_t*>(st);
     state_ptr_t& z = zs->zg_state();
     auto beg = builder_.outgoing(z).begin();
@@ -373,10 +390,30 @@ public:
     return statepool_.allocate();
   }
 
+  void check_tofree() const
+  {
+    // The front of the deque is the oldest element released, so it
+    // should not be necessary to look elsewhere.
+    while (!tofree_.empty() && tofree_.front().refcount() == 1)
+      {
+        bool res = allocator_.destruct_state(tofree_.front());
+        assert(res); (void) res;
+        tofree_.pop_front();
+      }
+  }
+
   void deallocate_state(const spot::state* st) const
   {
     auto zs = spot::down_cast<const tcltl_state_t*>(st);
-    zs->zg_state().~state_ptr_t();
+    // We can't destruct() the zg_state() immediately because it may
+    // still be present in TChecker data structures (like iterators or
+    // builders used to create those) and have a refcount != 1.  This
+    // situation is very frequent, so even if refcount == 1, we
+    // enqueue the state into the tofree_ buffer, and will check
+    // the refcount later, when we create the next succ_iterator.
+    //
+    // Move so that it's as is zs was destroyed.
+    tofree_.push_back(std::move(zs->zg_state()));
     statepool_.deallocate(const_cast<tcltl_state_t*>(zs));
   }
 
@@ -735,14 +772,14 @@ void tc_model::dump_info(std::ostream& out) const
 
 
 static spot::kripke_ptr
-instantiate_kripke(tchecker::gc_t& gc, tc_model_details_ptr tcmd,
+instantiate_kripke(tc_model_details_ptr tcmd,
                    const spot::bdd_dict_ptr& dict, const prop_list* ps,
                    spot::formula dead, zg_zone_semantics zone_sem)
 {
 #define inst(ZONE) \
   case ZONE: \
     return std::make_shared<tcltl_kripke<tchecker::zg::ta::ZONE ## _t>>\
-      (gc, tcmd, dict, ps, dead);
+      (tcmd, dict, ps, dead);
   switch (zone_sem)
     {
       inst(elapsed_no_extrapolation);
@@ -770,8 +807,7 @@ instantiate_kripke(tchecker::gc_t& gc, tc_model_details_ptr tcmd,
   return nullptr;
 }
 
-spot::kripke_ptr tc_model::kripke(tchecker::gc_t& gc,
-                                  const spot::atomic_prop_set* to_observe,
+spot::kripke_ptr tc_model::kripke(const spot::atomic_prop_set* to_observe,
                                   spot::bdd_dict_ptr dict,
                                   spot::formula dead,
                                   zg_zone_semantics zone_sem)
@@ -789,7 +825,7 @@ spot::kripke_ptr tc_model::kripke(tchecker::gc_t& gc,
     }
 
   spot::kripke_ptr res =
-    instantiate_kripke(gc, priv_, dict, ps, dead, zone_sem);
+    instantiate_kripke(priv_, dict, ps, dead, zone_sem);
 
   // All atomic propositions have been registered to the bdd_dict
   // for iface, but we also need to add them to the automaton so

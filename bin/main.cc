@@ -226,7 +226,6 @@ parse_opt(int key, char* arg, struct argp_state* state)
 static int run()
 {
   auto dict = spot::make_bdd_dict();
-  tchecker::gc_t gc;
   tc_model m = tc_model::load(model_filename);
 
   if (!formula_neg
@@ -246,25 +245,21 @@ static int run()
   if (!formula_neg && output_type == OUTPUT_DOT)
     {
       spot::atomic_prop_set ap;
-      auto k = m.kripke(gc, &ap, dict, dead_prop, zone_sem);
-      gc.start();
+      auto k = m.kripke(&ap, dict, dead_prop, zone_sem);
       k->set_named_prop("automaton-name", new std::string(model_filename));
       spot::print_dot(std::cout, k, ".kvA");
-      gc.stop();
       return 0;
     }
 
   spot::twa_graph_ptr af = spot::translator(dict).run(formula_neg);
   spot::atomic_prop_set ap;
   spot::atomic_prop_collect(formula_neg, &ap);
-  spot::twa_ptr k = m.kripke(gc, &ap, dict, dead_prop, zone_sem);
-  gc.start();
+  spot::twa_ptr k = m.kripke(&ap, dict, dead_prop, zone_sem);
   if (output_type == OUTPUT_DOT)
     {
       auto oldk = k;
       k = spot::make_twa_graph(k, spot::twa::prop_set::all(), true);
       // Make sure we stop gc before oldk is destroyed.
-      gc.stop();
     }
   int exit_code = 0;
   auto run = k->intersecting_run(af);
@@ -302,8 +297,6 @@ static int run()
       /* unreachable */
       break;
     }
-  if (output_type != OUTPUT_DOT)
-    gc.stop();
   return exit_code;
 }
 

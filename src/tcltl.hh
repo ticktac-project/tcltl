@@ -21,8 +21,6 @@
 
 #include <string>
 
-#include <tchecker/utils/gc.hh>
-
 #include <spot/tl/apcollect.hh>
 #include <spot/kripke/kripke.hh>
 #include <spot/tl/formula.hh>
@@ -88,15 +86,13 @@ public:
   //
   // This function returns nullptr on error.
   //
-  // \a gc TChecker's garbage collector
   // \a to_observe the list of atomic propositions that should be observed
   //               in the model
   // \a dict the BDD dictionary to use
   // \a dead an atomic proposition or constant to use for looping on
   //         dead states
   // \a zone_sem the zone semantics that TChecker should use
-  spot::kripke_ptr kripke(tchecker::gc_t& gc,
-                          const spot::atomic_prop_set* to_observe,
+  spot::kripke_ptr kripke(const spot::atomic_prop_set* to_observe,
                           spot::bdd_dict_ptr dict,
                           spot::formula dead = spot::formula::tt(),
                           zg_zone_semantics zone_sem =
