@@ -69,8 +69,8 @@ public:
   const tchecker::parsing::system_declaration_t* sysdecl;
   tchecker::zg::ta::model_t* model;
 
-  tc_model_details(tchecker::parsing::system_declaration_t const * sys,
-                  tchecker::zg::ta::model_t* m)
+  tc_model_details(tchecker::parsing::system_declaration_t const* sys,
+                   tchecker::zg::ta::model_t* m)
     : sysdecl(sys), model(m)
   {
   }
@@ -89,11 +89,11 @@ public:
 // always) inside.  We should try to store a state_t, or inherit from
 // state_t and see if we can reuse TChecker's allocators instead of
 // the one of Spot.
-template <typename STATE_PTR>
+template <typename KRIPKE, typename STATE_PTR>
 struct tcltl_state final: public spot::state
 {
-  tcltl_state(spot::fixed_size_pool* p, STATE_PTR zg)
-    : pool_(p), hash_val_(hash_value(*zg)), count_(1), zg_state_(zg)
+  tcltl_state(const KRIPKE* aut, STATE_PTR zg)
+    : aut_(aut), hash_val_(hash_value(*zg)), count_(1), zg_state_(zg)
   {
   }
 
@@ -103,12 +103,11 @@ struct tcltl_state final: public spot::state
     return const_cast<tcltl_state*>(this);
   }
 
-  void destroy() const override
+  inline void destroy() const override
   {
     if (--count_)
       return;
-    this->~tcltl_state(); // this destroys zg_state_
-    pool_->deallocate(const_cast<tcltl_state*>(this));
+    aut_->deallocate_state(this);
   }
 
   size_t hash() const override
@@ -144,7 +143,7 @@ private:
   {
   }
 
-  spot::fixed_size_pool* pool_;
+  const KRIPKE* aut_;
   unsigned hash_val_;
   mutable unsigned count_;
   mutable STATE_PTR zg_state_;
@@ -160,14 +159,14 @@ private:
 // wrapping of TChecker's iterator, another one for the looping case)
 // but that makes recycling harder (by requiring a slow dynamic_cast
 // for type checking).
-template <typename ITERATOR>
+template <typename ITERATOR, typename KRIPKE>
 class tcltl_succ_iterator final: public spot::kripke_succ_iterator
 {
 public:
-
-  tcltl_succ_iterator(spot::fixed_size_pool& pool, ITERATOR start, bdd cond,
+  tcltl_succ_iterator(const KRIPKE* aut,
+                      ITERATOR start, bdd cond,
                       const spot::state* selfloop)
-    : kripke_succ_iterator(cond), pool_(pool), start_(start), pos_(start),
+    : kripke_succ_iterator(cond), aut_(aut), start_(start), pos_(start),
       selfloop_(selfloop), done_(false)
   {
   }
@@ -220,11 +219,11 @@ public:
     if (selfloop_)
       return selfloop_->clone();
     auto [st, trans] = *pos_;
-    return new(pool_.allocate()) tcltl_state<decltype(st)>(&pool_, st);
+    return new(aut_->allocate_state()) tcltl_state<KRIPKE, typename KRIPKE::state_ptr_t>(aut_, st);
   }
 
 private:
-  spot::fixed_size_pool& pool_;
+  const KRIPKE* aut_;
   ITERATOR start_;
   ITERATOR pos_;
   const spot::state* selfloop_;
@@ -235,6 +234,7 @@ private:
 template <typename ZONE>
 class tcltl_kripke final: public spot::kripke
 {
+public:
   using zg_t = ZONE;
   using state_t = typename zg_t::shared_state_t;
   using state_ptr_t = typename zg_t::shared_state_ptr_t;
@@ -248,8 +248,9 @@ class tcltl_kripke final: public spot::kripke
   using builder_t =
     tchecker::ts::builder_ok_t<typename zg_t::ts_t, allocator_t>;
   using tcltl_succiter_t =
-    tcltl_succ_iterator<typename builder_t::outgoing_iterator_t>;
-
+    tcltl_succ_iterator<typename builder_t::outgoing_iterator_t, tcltl_kripke>;
+  using tcltl_state_t = tcltl_state<tcltl_kripke, state_ptr_t>;
+private:
   // Keep a shared pointer to the model and system so that they are
   // not deallocated before this Kripke structure.
   tc_model_details_ptr tcmd_;
@@ -272,7 +273,7 @@ public:
       allocator_(gc, std::make_tuple(*tcmd->model, 100000), std::tuple<>()),
       builder_(ts_, allocator_),
       ps_(ps),
-      statepool_(sizeof(tcltl_state<state_ptr_t>))
+      statepool_(sizeof(tcltl_state_t))
   {
     // Register the "dead" proposition.  There are three cases to
     // consider:
@@ -316,9 +317,9 @@ public:
     delete ps_;
   }
 
-  virtual tcltl_state<state_ptr_t>* get_init_state() const override
+  virtual const tcltl_state_t* get_init_state() const override
   {
-    tcltl_state<state_ptr_t>* res = nullptr;
+    tcltl_state_t* res = nullptr;
     bool first = true;
     auto initial_range = builder_.initial();
     for (auto it = initial_range.begin(); ! it.at_end(); ++it)
@@ -328,8 +329,7 @@ public:
           typename builder_t::transition_ptr_t trans;
           std::tie(st, trans) = *it;
           first = false;
-          res = new(statepool_.allocate())
-            tcltl_state<state_ptr_t>(&statepool_, st);
+          res = new(statepool_.allocate()) tcltl_state_t(this, st);
         }
       else
         {
@@ -341,7 +341,7 @@ public:
   virtual
   tcltl_succiter_t* succ_iter(const spot::state* st) const override
   {
-    auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st);
+    auto zs = spot::down_cast<const tcltl_state_t*>(st);
     state_ptr_t& z = zs->zg_state();
     auto beg = builder_.outgoing(z).begin();
     bdd scond = state_condition(st);
@@ -364,15 +364,27 @@ public:
         iter_cache_ = nullptr;
         return it;
       }
-    return new tcltl_succiter_t(statepool_, beg, scond,
+    return new tcltl_succiter_t(this, beg, scond,
                                 want_loop ? st->clone() : nullptr);
+  }
+
+  void* allocate_state() const
+  {
+    return statepool_.allocate();
+  }
+
+  void deallocate_state(const spot::state* st) const
+  {
+    auto zs = spot::down_cast<const tcltl_state_t*>(st);
+    zs->zg_state().~state_ptr_t();
+    statepool_.deallocate(const_cast<tcltl_state_t*>(zs));
   }
 
   virtual
   bdd state_condition(const spot::state* st) const override
   {
     bdd cond = bddtrue;
-    auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st)->zg_state();
+    auto zs = spot::down_cast<const tcltl_state_t*>(st)->zg_state();
     auto& vals = zs->intvars_valuation();
     auto& vloc = zs->vloc();
     for (const one_prop& prop: *ps_)
@@ -420,7 +432,7 @@ public:
   std::string format_state(const spot::state *st) const override
   {
     auto& model = ts_.model();
-    auto zs = spot::down_cast<const tcltl_state<state_ptr_t>*>(st)->zg_state();
+    auto zs = spot::down_cast<const tcltl_state_t*>(st)->zg_state();
     tchecker::zg::ta::state_outputter_t
       so(model.system_integer_variables().index(),
          model.system_clock_variables().index());
