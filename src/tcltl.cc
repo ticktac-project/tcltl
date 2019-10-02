@@ -744,8 +744,7 @@ void tc_model::dump_info(std::ostream& out) const
     {
       if (first)
         {
-          std::cout
-            << "The following location(s) may be used in the formula:\n";
+          out << "The following location(s) may be used in the formula:\n";
           first = false;
         }
       std::string const & process_name = process_index.value(loc->pid());
@@ -759,8 +758,7 @@ void tc_model::dump_info(std::ostream& out) const
     {
       if (first)
         {
-          std::cout
-            << "The following variable(s) may be used in the formula:\n";
+          out << "The following variable(s) may be used in the formula:\n";
           first = false;
         }
       auto id = idx.key(v);

@@ -58,4 +58,4 @@ test-suite.log
 /python/spot-extra/__pycache__/
 /python/spot-extra/tchecker.py
 /python/spot-extra/*.cxx
-
+.ipynb_checkpoints

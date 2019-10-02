@@ -39,9 +39,16 @@ srcdir="@srcdir@"
 case $1 in
   *.test)
     exec sh -x "$@";;
+  *.ipynb)
+    PYTHONPATH=$pypath DYLD_LIBRARY_PATH=$modpath \
+    PYTHONIOENCODING=utf-8:surrogateescape \
+    exec $PREFIXCMD @PYTHON@ @abs_srcdir@/ipnbdoctest.py "$@";;
   *.py)
     PYTHONPATH=$pypath DYLD_LIBRARY_PATH=$modpath \
     exec $PREFIXCMD @PYTHON@ "$@";;
+  *python*|*jupyter*)
+    PYTHONPATH=$pypath DYLD_LIBRARY_PATH=$modpath \
+    exec $PREFIXCMD "$@";;
   *)
     echo "Unknown extension" >&2
     exit 2;;

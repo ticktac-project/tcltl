@@ -19,7 +19,8 @@
 
 SUBDIRS = lib .
 
-EXTRA_DIST = tools/gitlog-to-changelog m4/gnulib-cache.m4 $(TESTS)
+EXTRA_DIST = tools/gitlog-to-changelog m4/gnulib-cache.m4 $(TESTS) \
+	tests/ipnbdoctest.py
 
 AM_CPPFLAGS = -I$(srcdir)/src
 
@@ -75,7 +76,9 @@ TESTS = \
   tests/errclout.test
 
 if USE_PYTHON
-TESTS += tests/python.py
+TESTS += \
+  tests/notebook.ipynb \
+  tests/python.py
 endif
 
 # Remove the test directories created in by tests/defs

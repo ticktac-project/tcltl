@@ -75,8 +75,10 @@ class model:
     return self.kripke_raw(s, dict, dead, zone_sem)
 
   def __repr__(self):
-    res = "tchecker model with the following variables:\nFIXME\n";
-    return res
+    res = "tchecker model\n";
+    ostr = spot.ostringstream()
+    self.dump_info(ostr)
+    return res + ostr.str()
 
 # Load IPython specific support if we can.
 try:
@@ -96,6 +98,9 @@ try:
                raise ValueError("missing variable name for %%tchecker")
             with spot.aux.tmpdir():
                with tempfile.NamedTemporaryFile(dir='.', suffix='.tc') as t:
+                   # See ticktac-project/tchecker#35
+                   if cell[-1] != '\n':
+                       cell += '\n'
                    t.write(cell.encode('utf-8'))
                    t.flush()
                    self.shell.user_ns[line] = load(t.name)
