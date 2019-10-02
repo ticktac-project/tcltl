@@ -86,6 +86,38 @@ fi
 
 LT_INIT([win32-dll])
 
+AC_ARG_ENABLE([python],
+              [AC_HELP_STRING([--disable-python],
+                              [do not compile Python bindings])],
+              [], [enable_python=yes])
+
+case $enable_shared:$enable_python in
+ no:no);;
+ no:*)
+    enable_python=no
+    AC_MSG_NOTICE([Not building Python bindings because of --disable-shared.])
+    ;;
+esac
+
+AM_CONDITIONAL([USE_PYTHON], [test "x${enable_python:-yes}" = xyes])
+
+if test "x${enable_python:-yes}" = xyes; then
+  AC_MSG_NOTICE([You may configure with --disable-python ]dnl
+[if you do not need Python bindings.])
+  adl_CHECK_PYTHON
+fi
+
+AC_ARG_WITH([spot],
+  [AS_HELP_STRING([--with-spot=PREFIXDIR],
+    [assume Spot has been installed in PREFIXDIR @<:@default to --prefix@:>@])],
+  [], [with_spot='${prefix}'])
+AC_SUBST([SPOTPREFIX], [$with_spot])
+
+# Debian has a binary for SWIG 3.0 named swig3.0 and they kept swig as
+# an alias for swig-2.0.  Let's use the former when available.
+AC_CHECK_PROGS([SWIG], [swig3.0 swig], [swig])
+AC_CHECK_PROG([PERL], [perl], [perl])
+
 AC_CONFIG_FILES([Makefile lib/Makefile tests/defs])
 AC_CONFIG_FILES([tests/run], [chmod +x tests/run])
 AC_OUTPUT

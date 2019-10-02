@@ -53,4 +53,9 @@ test-suite.log
 /tools/install-sh
 /tools/ltmain.sh
 /tools/missing
+/tools/py-compile
 /tools/test-driver
+/python/spot-extra/__pycache__/
+/python/spot-extra/tchecker.py
+/python/spot-extra/*.cxx
+

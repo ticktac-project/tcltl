@@ -29,10 +29,42 @@ src_libtcltl_la_SOURCES = src/tcltl.cc src/tcltl.hh
 bin_PROGRAMS = bin/tcltl
 bin_tcltl_SOURCES = bin/main.cc
 bin_tcltl_LDADD = src/libtcltl.la lib/libgnu.a \
-	-lspot -lbddx -ltchecker -lpthread
+	-L$(SPOTPREFIX)/lib -lspot -lbddx -ltchecker -lpthread
 bin_tcltl_CPPFLAGS = $(AM_CPPFLAGS) -Ilib -I$(top_srcdir)/lib
 
-# Explicitly set it to avoid default value ".test"
+
+
+# The "spot.tchecker" Python module.
+EXTRA_DIST += python/spot-extra/tchecker.i
+
+if USE_PYTHON
+tcpyexecdir = $(pyexecdir)/spot-extra
+tcpyexec_PYTHON = python/spot-extra/tchecker.py
+tcpyexec_LTLIBRARIES = python/spot-extra/_tchecker.la
+endif
+
+MAINTAINERCLEANFILES = python/spot/tchecker.cxx
+
+## Automake 1.16 fails to remove the __pycache__/* files.
+uninstall-local:
+	rm -rf $(DESTDIR)$(pyexecdir)/spot-extra/__pycache__
+
+python_spot_extra__tchecker_la_CPPFLAGS = \
+   -I$(PYTHONINC) -I$(top_srcdir)/src -DSWIG_TYPE_TABLE=spot
+python_spot_extra__tchecker_la_SOURCES = python/spot-extra/tchecker_wrap.cxx
+python_spot_extra__tchecker_la_LDFLAGS = -avoid-version -module $(SYMBOLIC_LDFLAGS)
+python_spot_extra__tchecker_la_LIBADD = \
+   src/libtcltl.la -L$(SPOTPREFIX)/lib -lspot -lbddx -ltchecker -lpthread
+
+SWIGFLAGS = -c++ -python -py3 -O -I$(SPOTPREFIX)/include -I$(top_srcdir)/src
+
+${srcdir}/python/spot-extra/tchecker_wrap.cxx: python/spot-extra/tchecker.i
+	$(SWIG) $(SWIGFLAGS) $(srcdir)/python/spot-extra/tchecker.i
+## work around https://github.com/swig/swig/issues/1553
+	$(PERL) -pi -e 's/^#define SWIG_Python_CallFunctor.*/#define SWIG_Python_CallFunctor(functor, obj) PyObject_CallFunctionObjArgs(functor, obj, NULL);/' $@
+
+
+# Empty TEST_EXTENSIONS it to avoid default value ".test"
 TEST_EXTENSIONS =
 LOG_COMPILER = tests/run
 check_SCRIPTS = tests/defs tests/run
@@ -41,6 +73,10 @@ TESTS = \
   tests/dead.test \
   tests/errcli.test \
   tests/errclout.test
+
+if USE_PYTHON
+TESTS += tests/python.py
+endif
 
 # Remove the test directories created in by tests/defs
 distclean-local:

@@ -17,15 +17,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Python needs to now where to find the *.py and *.so
+pypath='@abs_top_srcdir@/python:@abs_top_builddir@/python/spot-extra/.libs'
+# Darwin needs some help in figuring out where non-installed libtool
+# libraries are (on this platform libtool encodes the expected final
+# path of dependent libraries in each library).
+modpath='@abs_top_builddir@/python/spot-extra/.libs'
+modpath="$modpath:@abs_top_builddir@/src/.libs"
+
+
 PATH="@abs_top_builddir@/bin:$PATH"
 export PATH
 
 top_srcdir='@abs_top_srcdir@'
 export top_srcdir
 
+test -z "$1" &&
+    PYTHONPATH=$pypath DYLD_LIBRARY_PATH=$modpath exec $PREFIXCMD @PYTHON@
+srcdir="@srcdir@"
+
 case $1 in
   *.test)
     exec sh -x "$@";;
+  *.py)
+    PYTHONPATH=$pypath DYLD_LIBRARY_PATH=$modpath \
+    exec $PREFIXCMD @PYTHON@ "$@";;
   *)
     echo "Unknown extension" >&2
     exit 2;;

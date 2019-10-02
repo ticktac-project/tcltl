@@ -27,11 +27,12 @@ To compile:
 
   3. Finally, compile and install tcltl:
 
-     If you start from a git checkout, do
+     If you start from a git checkout, you should first install autoconf, automake,
+     libtool, swig, perl, python3-dev, then do
 
      $ cd tcltl
      $ autoreconf -vfi
-     $ ./configure
+     $ ./configure [OPTIONS]
      $ make
      $ make install
 
@@ -39,6 +40,13 @@ To compile:
 
      $ tar zxvf tcltl-X.Y.tar.gz
      $ cd tcltl-X.Y
-     $ ./configure
+     $ ./configure [OPTIONS]
      $ make
      $ make install
+
+     If Spot is installed in a non-default directory, you can specify
+     its location by passing --with-spot=PREFIXDIR as an option to
+     configure.  PREFIXDIR should be the directory that contains the
+     lib/ and include/ directories where Spot is installed.
+
+     You may disable the Python bindings with --disable-python.
