@@ -256,11 +256,7 @@ static int run()
   spot::atomic_prop_collect(formula_neg, &ap);
   spot::twa_ptr k = m.kripke(&ap, dict, dead_prop, zone_sem);
   if (output_type == OUTPUT_DOT)
-    {
-      auto oldk = k;
-      k = spot::make_twa_graph(k, spot::twa::prop_set::all(), true);
-      // Make sure we stop gc before oldk is destroyed.
-    }
+    k = spot::make_twa_graph(k, spot::twa::prop_set::all(), true);
   int exit_code = 0;
   auto run = k->intersecting_run(af);
   exit_code = !!run;
