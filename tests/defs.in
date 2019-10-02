@@ -23,16 +23,18 @@ test -f tests/defs || {
    exit 1
 }
 
-# If srcdir is not set, then we are not running from `make check'.
-if test -z "$srcdir"; then
-   # compute $srcdir.
-   srcdir=`echo "$0" | sed -e 's,/tests/[^\\/]*$,,'`
-   test $srcdir = $0 && srcdir=.
+top_srcdir='@abs_top_srcdir@'
+
+# If top_srcdir is not set, then we are not running from `make check'.
+if test -z "$top_srcdir"; then
+   # compute $top_srcdir.
+   top_srcdir=`echo "$0" | sed -e 's,/tests/[^\\/]*$,,'`
+   test $top_srcdir = $0 && top_srcdir=.
 fi
 
-# Ensure $srcdir is set correctly.  It should point to the root directory.
-test -f $srcdir/tests/defs.in || {
-   echo "$srcdir/tests/defs.in not found, check \$srcdir" 1>&2
+# Ensure $top_srcdir is set correctly.  It should point to the root directory.
+test -f $top_srcdir/tests/defs.in || {
+   echo "$top_srcdir/tests/defs.in not found, check \$srcdir" 1>&2
    exit 1
 }
 
@@ -49,13 +51,12 @@ cd $testSubDir
 # Adjust srcdir now that we are in a subdirectory.  We still want
 # $srcdir to point to the source directory corresponding to the build
 # directory that contains $testSubDir.
-case $srcdir in
+case $top_srcdir in
   [\\/$]* | ?:[\\/]* );;
-  *) srcdir=../$srcdir
+  *) top_srcdir=../$top_srcdir
 esac
 
 DOT='@DOT@'
-top_srcdir='@abs_top_srcdir@'
 
 # The test cases assume these variables are undefined
 unset SPOT_DOTEXTRA
