@@ -1,0 +1,34 @@
+language: cpp
+
+os: linux
+dist: bionic
+
+env:
+  - MAKEFLAGS=-j2 PYTHONPATH=/usr/local/lib/python3.6/site-packages
+
+install:
+  - .ci-scripts/install-catch2.sh
+  - .ci-scripts/install-tchecker.sh
+  - .ci-scripts/install-spot.sh
+
+compiler:
+  - gcc
+  - clang
+
+script:
+  - autoreconf -vfi
+  - ./configure
+  - make
+  - make check
+  - make distcheck
+
+after_failure:
+  - cat config.log
+  - cat test-suite.log
+  - cat tcltl-*/_build/sub/test-suite.log
+
+addons:
+  apt:
+    packages:
+    - libboost-all-dev swig
+    update: true
