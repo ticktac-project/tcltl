@@ -319,7 +319,7 @@ int main(int argc, char * argv[])
     exit_code = run();
   }
   catch (const std::exception& e) {
-    error(2, 0, e.what());
+    error(2, 0, "%s", e.what());
   }
 
   // Make sure we abort if we can't write to std::cout anymore
