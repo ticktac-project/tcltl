@@ -6,7 +6,7 @@ LTL model checking), and developped as part of the tick-tac project.
 
 To compile:
 
-  1. Install a recent release of Spot
+  1. Install a recent release of Spot (at least 2.8.3)
 
      https://spot.lrde.epita.fr/install.html
 
