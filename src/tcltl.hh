@@ -68,6 +68,11 @@ public:
   // This will throw an exception on error.
   static tc_model load(const std::string filename);
 
+
+  // Return any warnings that was output while instantiating the
+  // model.  Calling this function will clear the logs.
+  std::string get_logs() const;
+
   // Display the list of variables we can use on this model.
   void dump_info(std::ostream& out) const;
 

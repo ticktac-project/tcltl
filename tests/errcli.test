@@ -36,6 +36,19 @@ test $? -eq 2
 grep 'end of file' err
 grep '^tcltl: System declaration could not be built\.' err
 
+# label warning
+cat >model <<EOF
+system:test
+event:e
+process:P
+int:1:1:3:1:vari
+clock:1:x
+location:P:l1{foo:}
+edge:P:l1:l1:e
+EOF
+tcltl model 2>err >std
+grep -i 'WARNING.*ignoring attribute foo' err
+
 # no formula given
 cat >model <<EOF
 system:test

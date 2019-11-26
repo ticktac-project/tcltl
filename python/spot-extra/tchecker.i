@@ -45,6 +45,12 @@
   try {
     $action
   }
+  catch (const spot::parse_error& e)
+  {
+    std::string er("\n");
+    er += e.what();
+    SWIG_Error(SWIG_SyntaxError, er.c_str());
+  }
   catch (const std::runtime_error& e)
   {
     SWIG_exception(SWIG_RuntimeError, e.what());
@@ -60,9 +66,33 @@ import spot
 import spot.aux
 import sys
 import subprocess
+import tempfile
 
 def load(filename):
-  return model.load(filename)
+  """Load a TChecker model.
+
+The argument is assumed to be a filename if it contains no newline.
+Otherwise it is assumed to be the actual text of the model.
+"""
+  if '\n' in filename:
+    # Assume it's an actual model.
+    with spot.aux.tmpdir():
+       with tempfile.NamedTemporaryFile(dir='.', suffix='.tc') as t:
+           # See ticktac-project/tchecker#35
+           if filename[-1] != '\n':
+               filename += '\n'
+           t.write(filename.encode('utf-8'))
+           t.flush()
+           return load(t.name)
+  try:
+    m = model.load(filename)
+    logs = m.get_logs()
+    if logs:
+      print(logs, end='', file=sys.stderr)
+  except RuntimeError as err:
+    print(str(err), end='', file=sys.stderr)
+    m = None
+  return m
 
 @spot._extend(model)
 class model:
@@ -86,8 +116,6 @@ try:
     __IPYTHON__
 
     from IPython.core.magic import Magics, magics_class, cell_magic
-    import os
-    import tempfile
 
     @magics_class
     class EditTC(Magics):
@@ -96,14 +124,11 @@ try:
         def tchecker(self, line, cell):
             if not line:
                raise ValueError("missing variable name for %%tchecker")
-            with spot.aux.tmpdir():
-               with tempfile.NamedTemporaryFile(dir='.', suffix='.tc') as t:
-                   # See ticktac-project/tchecker#35
-                   if cell[-1] != '\n':
-                       cell += '\n'
-                   t.write(cell.encode('utf-8'))
-                   t.flush()
-                   self.shell.user_ns[line] = load(t.name)
+            # Make sure we have at least one newline so that
+            # the cell is not interpreted as a filename
+            if cell[-1] != '\n':
+               cell += '\n'
+            self.shell.user_ns[line] = load(cell)
 
     ip = get_ipython()
     ip.register_magics(EditTC)

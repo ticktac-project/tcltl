@@ -78,6 +78,7 @@ TESTS = \
 if USE_PYTHON
 TESTS += \
   tests/notebook.ipynb \
+  tests/parseerr.ipynb \
   tests/python.py
 endif
 

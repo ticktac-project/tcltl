@@ -227,6 +227,9 @@ static int run()
 {
   auto dict = spot::make_bdd_dict();
   tc_model m = tc_model::load(model_filename);
+  std::string logs = m.get_logs();
+  if (!logs.empty())
+    std::cerr << logs;
 
   if (!formula_neg
       && output_type != OUTPUT_VARS

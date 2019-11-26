@@ -22,6 +22,7 @@
 // with LTSmin, as seen in Spot's spot/ltsmin/ltsmin.cc file.
 
 #include <iostream>
+#include <sstream>
 #include <cassert>
 
 #include <tchecker/parsing/parsing.hh>
@@ -66,19 +67,27 @@ typedef std::vector<one_prop> prop_list;
 struct tc_model_details final
 {
 public:
+  std::ostringstream os;
+  tchecker::log_t log = &os;
   const tchecker::parsing::system_declaration_t* sysdecl;
   tchecker::zg::ta::model_t* model;
 
-  tc_model_details(tchecker::parsing::system_declaration_t const* sys,
-                   tchecker::zg::ta::model_t* m)
-    : sysdecl(sys), model(m)
+  std::string get_logs()
   {
+    std::string res = os.str();
+    os.str("");
+    return res;
   }
 
   ~tc_model_details()
   {
     delete model;
     delete sysdecl;
+    std::string logs = get_logs();
+    if (!logs.empty())
+      std::cerr << ("The following diagnostics where not "
+                    "captured by an exception:\n")
+                << logs;
   }
 };
 
@@ -722,14 +731,23 @@ tc_model::tc_model(tc_model_details* tcm)
 
 tc_model tc_model::load(const std::string filename)
 {
-  tchecker::log_t log(&std::cerr);
-  auto* sysdecl = tchecker::parsing::parse_system_declaration(filename, log);
+  auto tcm = std::make_unique<tc_model_details>();
+
+  auto* sysdecl =
+    tchecker::parsing::parse_system_declaration(filename, tcm->log);
 
   if (sysdecl == nullptr)
-    throw std::runtime_error("System declaration could not be built.");
-  auto tcm = new tc_model_details(sysdecl,
-                                  new tchecker::zg::ta::model_t(*sysdecl, log));
-  return tc_model(tcm);
+    throw std::runtime_error("System declaration could not be built.\n"
+                             + tcm->get_logs());
+
+  tcm->sysdecl = sysdecl;
+  tcm->model = new tchecker::zg::ta::model_t(*sysdecl, tcm->log);
+  return tc_model(tcm.release());
+}
+
+std::string tc_model::get_logs() const
+{
+  return priv_->get_logs();
 }
 
 void tc_model::dump_info(std::ostream& out) const
